@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  background-color: #020617; /* slate-950 */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", Arial;
+}
+
+* {
+  box-sizing: border-box;
+}

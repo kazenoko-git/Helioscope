@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "types": ["@tauri-apps/api"],
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "paths": {
+      "*": ["src/*"]
+    },
+    "jsxImportSource": "react"
+  },
+  "include": ["src"]
+}
