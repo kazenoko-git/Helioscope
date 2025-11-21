@@ -15,5 +15,4 @@ img = Imagen(provider=provider).getMegaStitchedTiles(lat, lon, zoom, radius)
 output = f"tile_{lat}_{lon}_{zoom}.png"
 img.save(output)
 
-# Print ONLY the path (Tauri will capture this)
 print(output)

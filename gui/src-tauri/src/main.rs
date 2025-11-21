@@ -87,6 +87,42 @@ fn fetch_stitched_tile(
     Ok(format!("data:image/png;base64,{}", b64))
 }
 
+#[command]
+fn run_ai_analysis(image_b64: String) -> Result<String, String> {
+    use std::io::Write;
+
+    // 1. Write image to temp file
+    let project = env::current_dir().unwrap();
+    let gui_dir = project.parent().unwrap();
+    let tmp_path = gui_dir.join("tmp_input.png");
+
+    let image_bytes = base64::decode(image_b64.replace("data:image/png;base64,", ""))
+        .map_err(|e| e.to_string())?;
+
+    fs::write(&tmp_path, image_bytes)
+        .map_err(|e| format!("Failed to write temp PNG: {e}"))?;
+
+    // 2. RUN PYTHON AI SCRIPT
+    let script = gui_dir.join("run_model.py");
+    let model = gui_dir.join("verifier1.pt");
+
+    let output = Command::new(gui_dir.join("../.venv/bin/python"))
+        .arg(&script)
+        .arg(&tmp_path)
+        .arg(&model)
+        .output()
+        .map_err(|e| format!("Failed to run AI script: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    if !output.status.success() {
+        return Err(format!("AI script error: {}", stdout));
+    }
+
+    Ok(stdout.to_string())
+}
+
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -96,7 +132,7 @@ fn main() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![fetch_stitched_tile])
+        .invoke_handler(tauri::generate_handler![fetch_stitched_tile, run_ai_analysis])
         .run(tauri::generate_context!())
         .expect("error while running Tauri app");
 }

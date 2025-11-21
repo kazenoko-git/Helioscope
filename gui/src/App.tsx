@@ -13,7 +13,7 @@ type FetchParams = {
 type View = "select" | "results";
 
 export default function App() {
-  // Global state
+  // --- GLOBAL STATE ---
   const [lat, setLat] = useState(12.8604075);
   const [lon, setLon] = useState(77.6625644);
 
@@ -24,14 +24,16 @@ export default function App() {
   const [siteMeta, setSiteMeta] = useState<SiteMeta | null>(null);
   const [aiResult, setAiResult] = useState<AiResult | null>(null);
 
-  // MAIN ANALYSIS FLOW (Window 1 → Window 2)
+  // --- MAIN ANALYSIS PIPELINE ---
   const handleAnalyze = async ({ zoom, radius, provider }: FetchParams) => {
+    setLoading(true);
     console.log("Start AI analysis:", { lat, lon, zoom, radius, provider });
 
-    setLoading(true);
     try {
-      // 1. Fetch stitched tile via Tauri backend (imagenRunner)
-      const dataUrl = await invoke<string>("fetch_stitched_tile", {
+      // --------------------------------------------
+      // 1) FETCH STITCHED TILE FROM PYTHON (imagenRunner)
+      // --------------------------------------------
+      const stitchedTile = await invoke<string>("fetch_stitched_tile", {
         lat,
         lon,
         zoom,
@@ -39,10 +41,12 @@ export default function App() {
         provider,
       });
 
-      console.log("Tile data URL length:", dataUrl?.length || 0);
-      setImageSrc(dataUrl);
+      console.log("Tile data URL length:", stitchedTile?.length || 0);
+      setImageSrc(stitchedTile);
 
-      // 2. Site metadata (this will eventually match your CSV schema)
+      // --------------------------------------------
+      // 2) BUILD SITE META (for ResultsView + JSON export)
+      // --------------------------------------------
       const meta: SiteMeta = {
         sample_id: `${Date.now()}`,
         lat,
@@ -53,38 +57,38 @@ export default function App() {
       };
       setSiteMeta(meta);
 
-      // 3. TEMP: fake AI result on frontend
-      // TODO: replace this with invoke<AiResult>("run_ai_analysis", {...})
-      const fake: AiResult = {
+      // --------------------------------------------
+      // 3) RUN YOLO AI MODEL (via run_ai_analysis)
+      // --------------------------------------------
+      const aiJson = await invoke<string>("run_ai_analysis", {
+        imageB64: stitchedTile,
+      });
+
+      console.log("AI JSON:", aiJson);
+
+      const parsed: AiResult = JSON.parse(aiJson);
+      setAiResult({
+        ...parsed,
         sample_id: meta.sample_id,
         lat: meta.lat,
         lon: meta.lon,
-        has_solar: true,
-        confidence: 0.87,
-        panel_count_est: 18,
-        pv_area_sqm_est: 32.4,
-        capacity_kw_est: 6.5,
-        qc_status: "verifiable",
-        qc_notes: ["clear roof view", "distinct module grid", "strong shadows"],
-        bbox_or_mask: "",
-        image_metadata: {
-          source: provider.toUpperCase(),
-          capture_date: "2025-01-01",
-        },
-      };
-      setAiResult(fake);
+      });
 
-      // 4. Switch to Window 2
+      // --------------------------------------------
+      // 4) SWITCH TO WINDOW 2 (RESULTS)
+      // --------------------------------------------
       setView("results");
     } catch (err) {
-      console.error("Fetch / analysis failed:", err);
-      alert("Failed to run analysis. Check console for details.");
+      console.error("Fetch / AI failed:", err);
+      alert("AI processing failed. Check console for details.");
     } finally {
       setLoading(false);
     }
   };
 
-  // WINDOW 2 – RESULTS
+  // --------------------------------------------
+  // WINDOW 2 — RESULTS PAGE
+  // --------------------------------------------
   if (view === "results" && siteMeta && aiResult) {
     return (
       <ResultsView
@@ -96,10 +100,12 @@ export default function App() {
     );
   }
 
-  // WINDOW 1 – MAP SELECTION
+  // --------------------------------------------
+  // WINDOW 1 — MAP + SIDEBAR
+  // --------------------------------------------
   return (
     <div className="flex h-screen w-screen bg-slate-950 text-white overflow-hidden min-w-0 min-h-0">
-      {/* LEFT: sidebar */}
+      {/* SIDEBAR (left) */}
       <Sidebar
         lat={lat}
         lon={lon}
@@ -109,7 +115,7 @@ export default function App() {
         loading={loading}
       />
 
-      {/* RIGHT: full-bleed map */}
+      {/* MAP AREA (right) */}
       <div className="flex-1 flex min-w-0 min-h-0">
         <MapPicker
           lat={lat}
