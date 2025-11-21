@@ -1,5 +1,5 @@
 [package]
-name = "helioscope"
+name = "terralyte"
 version = "1.0.0"
 description = "AI-Powered Solar Panel Detection"
 authors = ["Wing-It Team"]

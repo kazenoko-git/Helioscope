@@ -429,7 +429,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             if let Some(win) = app.get_webview_window("main") {
-                win.set_title("Helioscope - Solar Panel Detection")?;
+                win.set_title("Terralyte")?;
             }
             Ok(())
         })

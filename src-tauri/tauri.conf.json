@@ -1,7 +1,7 @@
 {
-  "productName": "Helioscope",
+  "productName": "Terralyte",
   "version": "1.0.0",
-  "identifier": "com.wingit.helioscope",
+  "identifier": "com.wingit.terralyte",
 
   "build": {
     "beforeDevCommand": "npm run dev",

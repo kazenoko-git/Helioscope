@@ -34,7 +34,7 @@ export default function Sidebar({
       {/* Logo */}
       <div className="space-y-1">
         <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
-          Helioscope
+          Terralyte
         </h1>
         <p className="text-xs text-slate-500">by Wing-It Team</p>
       </div>
