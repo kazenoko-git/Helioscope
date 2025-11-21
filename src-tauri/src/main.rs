@@ -5,6 +5,11 @@ use tauri::{command, Manager};
 use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tauri_plugin_dialog;
+use tauri_plugin_fs;
+use tauri_plugin_shell;
+
+
 
 // ============================================================
 // DATA STRUCTURES
@@ -12,23 +17,46 @@ use serde_json::{json, Value};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct SolarDetection {
+    // ADDED DEFAULTS TO ALL CSV/APP FIELDS
+    #[serde(default)]
     sample_id: String,
+
+    #[serde(default)]
     lat: f64,
+
+    #[serde(default)]
     lon: f64,
+
     has_solar: bool,
     confidence: f64,
     panel_count_est: usize,
     pv_area_sqm_est: f64,
     capacity_kw_est: f64,
     qc_status: String,
+
+    #[serde(default)]
     qc_notes: Vec<String>,
+
+    #[serde(default)]
     bbox_or_mask: Vec<Vec<Vec<f64>>>,
+
+    // THESE THREE MUST *ALSO* BE OPTIONAL
+    #[serde(default)]
     zoom: u32,
+
+    #[serde(default)]
     radius: u32,
+
+    #[serde(default)]
     provider: String,
+
+    #[serde(default)]
     audit_overlay_path: Option<String>,
+
+    #[serde(default)]
     image_metadata: Option<ImageMetadata>,
 }
+
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ImageMetadata {
@@ -197,6 +225,90 @@ fn run_ai_analysis(image_b64: String) -> Result<String, String> {
 }
 
 #[command]
+fn process_csv_batch(
+    csv_path: String,
+    zoom: u32,
+    radius: u32,
+    provider: String,
+) -> Result<Vec<SolarDetection>, String> {
+    use csv::ReaderBuilder;
+
+    // Figure out paths
+    let (project_root, gui_dir) = get_paths()?;
+
+    // Open CSV
+    let mut reader = ReaderBuilder::new()
+        .has_headers(true)
+        .from_path(&csv_path)
+        .map_err(|e| format!("Failed to read CSV: {}", e))?;
+
+    let mut results = Vec::new();
+
+    for row in reader.deserialize() {
+        let row: CsvRow = row.map_err(|e| format!("Bad CSV row: {}", e))?;
+
+        // Fetch stitched tile
+        let tile_b64 = fetch_stitched_tile(
+            row.lat,
+            row.lon,
+            zoom,
+            radius,
+            provider.clone(),
+        )?;
+
+        // Run AI on that
+        let ai_json = run_ai_analysis(tile_b64)?;
+
+        // Extract JSON line from stdout
+        let json_line = ai_json
+            .lines()
+            .find(|l| l.trim().starts_with('{'))
+            .ok_or("AI output missing JSON")?;
+
+        let mut det: SolarDetection =
+            serde_json::from_str(json_line)
+                .map_err(|e| format!("AI JSON parse error: {}", e))?;
+
+        // Fill metadata
+        det.sample_id = row.sample_id;
+        det.lat = row.lat;
+        det.lon = row.lon;
+        det.zoom = zoom;
+        det.radius = radius;
+        det.provider = provider.clone();
+
+        results.push(det);
+    }
+
+    Ok(results)
+}
+
+#[command]
+fn save_batch_results(
+    detections: Vec<SolarDetection>,
+    batch_name: String,
+) -> Result<String, String> {
+    let (_tauri_dir, project_root) = get_paths()?;
+
+    
+    let output_dir = project_root.join("batch_results");
+    std::fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
+    
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let filename = format!("{}_{}.json", batch_name, timestamp);
+    let output_path = output_dir.join(&filename);
+    
+    let json_string = serde_json::to_string_pretty(&detections)
+        .map_err(|e| format!("Failed to serialize: {}", e))?;
+    
+    std::fs::write(&output_path, json_string)
+        .map_err(|e| format!("Failed to write file: {}", e))?;
+    
+    Ok(output_path.to_string_lossy().to_string())
+}
+
+
+#[command]
 fn load_overlay_image(image_path: String) -> Result<String, String> {
     let path = PathBuf::from(&image_path);
 
@@ -312,6 +424,9 @@ fn add_to_training_data(detection: SolarDetection) -> Result<String, String> {
 
 fn main() {
     tauri::Builder::default()
+    .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             if let Some(win) = app.get_webview_window("main") {
                 win.set_title("Helioscope - Solar Panel Detection")?;
@@ -327,7 +442,9 @@ fn main() {
             save_audit_overlay,
             clear_tile_cache,
             get_cache_size,
-            add_to_training_data
+            add_to_training_data,
+            process_csv_batch,
+            save_batch_results
         ])
         .run(tauri::generate_context!())
         .expect("error running Tauri app");

@@ -1,0 +1,14 @@
+[permissions]
+default = [
+  "dialog:allow-open",
+  "dialog:allow-save",
+  "fs:allow-read",
+  "fs:allow-write",
+  "fs:allow-copy",
+  "fs:allow-remove",
+  "fs:allow-rename",
+  "fs:allow-mkdir",
+  "fs:allow-read-dir",
+  "fs:allow-read-file",
+  "shell:allow-open"
+]
